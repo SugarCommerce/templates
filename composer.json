@@ -1,0 +1,19 @@
+{
+  "name": "sugarcommerce/templates",
+  "version": "1.0.0",
+  "description": "A small Blade-like template engine for plain PHP: auto-escaping by default, layouts and sections, includes, and compiled output cached to disk. Zero dependencies.",
+  "type": "library",
+  "license": "GPL-2.0-or-later",
+  "homepage": "https://github.com/sugarcommerce/templates",
+  "authors": [ { "name": "David Sherlock", "homepage": "https://arraypress.com/" } ],
+  "keywords": ["templates", "blade", "view", "escaping", "php"],
+  "require": { "php": ">=8.5" },
+  "require-dev": { "phpunit/phpunit": "^13.0" },
+  "autoload": { "psr-4": { "SugarCommerce\\Templates\\": "src/" } },
+  "autoload-dev": { "psr-4": { "SugarCommerce\\Templates\\Tests\\": "tests/" } },
+  "scripts": { "test": "phpunit" },
+  "config": { "optimize-autoloader": true, "sort-packages": true, "preferred-install": "dist" },
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+  "support": { "issues": "https://github.com/sugarcommerce/templates/issues", "source": "https://github.com/sugarcommerce/templates" }
+}
