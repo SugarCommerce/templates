@@ -36,7 +36,7 @@ final class Engine {
 	 * A layout that extends itself is a hang rather than an error, so this
 	 * turns it into one that names the file.
 	 */
-	private const MAX_LAYOUTS = 16;
+	private const int MAX_LAYOUTS = 16;
 
 	private readonly Compiler $compiler;
 

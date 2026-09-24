@@ -1,6 +1,6 @@
 {
   "name": "sugarcommerce/templates",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A small Blade-like template engine for plain PHP: auto-escaping by default, layouts and sections, includes, and compiled output cached to disk. Zero dependencies.",
   "type": "library",
   "license": "GPL-2.0-or-later",
