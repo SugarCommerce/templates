@@ -128,37 +128,51 @@ final class Environment {
 	/**
 	 * Set a section to a short value, without a block.
 	 *
-	 * The value is markup, not text: it is stored and later yielded exactly
-	 * as given, the way `{!! !!}` prints. Escape anything that did not
-	 * come from you — `@section( 'title', Engine::e( $product['name'] ) )`,
-	 * with the class named in full, or the block form with `{{ }}` inside it.
+	 * The value is text, and is escaped as it is stored — the way `{{ }}`
+	 * prints, and the way Blade's inline `@section` does. A section is
+	 * markup once it is stored, because a block-form section is captured
+	 * output; escaping the inline value here is what makes the two forms
+	 * mean the same thing, and `@section( 'title', $product['name'] )` safe
+	 * whatever the name is. Markup built on purpose goes in the block form,
+	 * between `{!! !!}`.
+	 *
+	 * Escaped since 1.1.0. Before, it was stored as given.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @param string $name  Section name.
-	 * @param string $value Its content.
+	 * @param mixed  $value Its content, as text.
 	 *
 	 * @return void
+	 *
+	 * @throws \InvalidArgumentException When the value cannot be printed
+	 *                                   (see Engine::e()).
 	 */
-	public function set( string $name, string $value ): void {
-		$this->sections[ $name ] ??= $value;
+	public function set( string $name, mixed $value ): void {
+		$this->sections[ $name ] ??= Engine::e( $value );
 	}
 
 	/**
-	 * The content of a section.
+	 * The content of a section, or the default escaped.
 	 *
-	 * Markup, unescaped, and so is the default: both are printed by
-	 * `@yield` as they are.
+	 * A section is markup — captured output, or an inline value escaped
+	 * when it was set — and comes back as it is. The default is text, and
+	 * is escaped like Blade's: `@yield( 'title', $shop['name'] )` must not
+	 * become a way to print a name raw.
+	 *
+	 * The default is escaped since 1.1.0. Before, it was returned as given.
 	 *
 	 * @since 1.0.0
 	 *
 	 * @param string $name    Section name.
-	 * @param string $default Returned when nothing filled it in.
+	 * @param mixed  $default Text returned, escaped, when nothing filled it in.
 	 *
 	 * @return string
+	 *
+	 * @throws \InvalidArgumentException When the default cannot be printed.
 	 */
-	public function yield( string $name, string $default = '' ): string {
-		return $this->sections[ $name ] ?? $default;
+	public function yield( string $name, mixed $default = '' ): string {
+		return $this->sections[ $name ] ?? Engine::e( $default );
 	}
 
 	/**

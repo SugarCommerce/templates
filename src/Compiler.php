@@ -380,10 +380,9 @@ final class Compiler {
 	/**
 	 * Compile `@section`, in both of its forms.
 	 *
-	 * The inline form's value is stored as it is and printed by `@yield`
-	 * as it is — raw, like `{!! !!}`. It is for literals and for markup
-	 * built on purpose; anything else goes through `e()` first, or in the
-	 * block form between `{{ }}`.
+	 * The inline form's value is text: Environment::set() escapes it, as
+	 * `{{ }}` would, and `@yield` prints the result. Markup built on purpose
+	 * goes in the block form, between `{!! !!}`.
 	 *
 	 * @since 1.0.0
 	 *

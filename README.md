@@ -156,10 +156,17 @@ it is printing:
   `red;background:url(…)` survives every escaper and is still CSS.
 - **Always quote attributes.** Unquoted, a space starts a new one.
 
-`@section( 'title', … )` stores its value as markup and `@yield` prints it as
-it is, like `{!! !!}`; so does `@yield`'s default. Put anything that did not
-come from you through `\SugarCommerce\Templates\Engine::e()` first, or use
-the block form with `{{ }}` inside it.
+`@section( 'title', $value )` and `@yield( 'title', $default )` escape their
+value the way `{{ }}` does, like Blade's: an inline section and a default are
+text. A block section is captured output and is printed as it was captured, so
+markup you built on purpose goes in the block form:
+
+```blade
+@section( 'title', $product['name'] )                        {{-- escaped --}}
+@section( 'footer' ){!! $links_html !!}@endsection          {{-- raw, visibly --}}
+```
+
+Before 1.1.0 the inline value and the default were printed raw.
 
 ## The cache is code
 

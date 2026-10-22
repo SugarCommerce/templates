@@ -296,6 +296,48 @@ final class EngineTest extends TestCase {
 		$this->assertSame( '<title>Orders</title>', $this->render( 'page' ) );
 	}
 
+	/**
+	 * Like Blade: an inline section is text. It used to be stored as given,
+	 * so `@section( 'title', $name )` printed a name raw.
+	 */
+	public function test_an_inline_section_is_escaped(): void {
+		$this->write( 'layouts.main', '<title>@yield( "title" )</title><a href="?@yield( "q" )">' );
+		$this->write( 'page', '@extends( "layouts.main" )@section( "title", $name )@section( "q", "a=1&b=2" )' );
+
+		$this->assertSame(
+			'<title>&lt;script&gt;alert(1)&lt;/script&gt; &amp; co</title><a href="?a=1&amp;b=2">',
+			$this->render( 'page', array( 'name' => '<script>alert(1)</script> & co' ) )
+		);
+	}
+
+	public function test_an_inline_section_refuses_what_it_cannot_print(): void {
+		$this->write( 'layouts.main', '@yield( "title" )' );
+		$this->write( 'page', '@extends( "layouts.main" )@section( "title", array( 1 ) )' );
+
+		$this->expectException( \InvalidArgumentException::class );
+
+		$this->render( 'page' );
+	}
+
+	public function test_a_yield_default_is_escaped(): void {
+		$this->write( 'layouts.main', '<title>@yield( "title", $fallback )</title>' );
+		$this->write( 'page', '@extends( "layouts.main" )' );
+
+		$this->assertSame( '<title>Tom &amp; Jerry&#039;s &lt;b&gt;</title>', $this->render( 'page', array( 'fallback' => "Tom & Jerry's <b>" ) ) );
+	}
+
+	/**
+	 * A block section is captured output and is printed as it was
+	 * captured: escaped where it said `{{ }}`, raw where it said `{!! !!}`,
+	 * never twice.
+	 */
+	public function test_a_block_section_is_printed_as_captured(): void {
+		$this->write( 'layouts.main', '<p>@yield( "body", "unused" )</p>' );
+		$this->write( 'page', '@extends( "layouts.main" )@section( "body" ){{ $text }} {!! $html !!}@endsection' );
+
+		$this->assertSame( '<p>a &amp; b <em>c</em></p>', $this->render( 'page', array( 'text' => 'a & b', 'html' => '<em>c</em>' ) ) );
+	}
+
 	public function test_layouts_nest(): void {
 		$this->write( 'layouts.base', '<html>@yield( "shell" )</html>' );
 		$this->write( 'layouts.admin', '@extends( "layouts.base" )@section( "shell" )<nav></nav>@yield( "body" )@endsection' );
