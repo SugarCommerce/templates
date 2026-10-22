@@ -50,6 +50,7 @@ where a template's `@include`s can change without its own mtime moving.
 ```blade
 {{ $value }}              escaped output
 {!! $value !!}            raw output
+@json( $value )           JSON, safe inside <script> and in a quoted attribute
 {{-- a note --}}          removed entirely, unlike an HTML comment
 @@if                      a literal @if
 
@@ -140,11 +141,38 @@ reads its bodies rather than including them, for that shape.
 There is no `$loop` variable, no components, no view composers and no service
 container. The whole engine is three classes.
 
+## Escaping is for HTML
+
+`{{ }}` makes a value safe as text between tags and as an attribute value in
+quotes. It does nothing useful anywhere else, and the engine cannot tell where
+it is printing:
+
+- **In `<script>`**, use `@json( $value )`. A backslash in `'{{ $value }}'`
+  ends the string early; `@json` cannot be broken out of, and a `</script>`
+  inside the value cannot close the block.
+- **In `href` or `src`**, check the scheme before the value gets here.
+  `javascript:alert(1)` has nothing in it to escape.
+- **In `style`**, validate — a colour is `#rrggbb` or it is not used.
+  `red;background:url(…)` survives every escaper and is still CSS.
+- **Always quote attributes.** Unquoted, a space starts a new one.
+
+`@section( 'title', … )` stores its value as markup and `@yield` prints it as
+it is, like `{!! !!}`; so does `@yield`'s default. Put anything that did not
+come from you through `\SugarCommerce\Templates\Engine::e()` first, or use
+the block form with `{{ }}` inside it.
+
+## The cache is code
+
+Compiled templates are PHP that the next render `require`s. Anybody who can
+write to the cache directory can run anything as your application: keep it
+outside the document root and writable by the application alone.
+
 ## Printing the wrong thing
 
 `{{ $rows }}` where `$rows` is an array throws, naming the type. Printing the
 word `Array` into a page is a bug that survives review; an exception does not.
-`null` and `false` print nothing.
+`null` and `false` print nothing. A string that is not valid UTF-8 prints with
+U+FFFD in place of the bad bytes rather than vanishing.
 
 ## Testing
 

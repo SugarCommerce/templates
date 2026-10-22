@@ -39,13 +39,17 @@ final class Compiler {
 	 *
 	 * Each needs its own "did the loop body run" flag, or an inner loop
 	 * clobbers the outer one's and the wrong `@empty` branch fires.
+	 *
+	 * @since 1.0.0
 	 */
 	private int $forelse = 0;
 
 	/**
 	 * Raw blocks lifted out before compiling.
 	 *
-	 * @var array<int, string>
+	 * @since 1.0.0
+	 *
+	 * @var list<string>
 	 */
 	private array $raw = array();
 
@@ -70,7 +74,9 @@ final class Compiler {
 		$source = $this->directives( $source );
 		$source = $this->restore_raw( $source );
 
-		$header = '' === $origin ? '' : '<?php /* Compiled from ' . $origin . ' — do not edit. */ ?>' . "\n";
+		// The path goes inside a PHP comment, so a `*/` in it would end the
+		// comment and turn the rest of the file name into code.
+		$header = '' === $origin ? '' : '<?php /* Compiled from ' . str_replace( '*/', '*\\/', $origin ) . ' — do not edit. */ ?>' . "\n";
 
 		return $header . $source;
 	}
@@ -255,6 +261,7 @@ final class Compiler {
 			'section'     => $this->section( (string) $expression ),
 			'endsection'  => '<?php $__env->stop(); ?>',
 			'yield'       => '<?php echo $__env->yield( ' . $expression . ' ); ?>',
+			'json'        => null === $expression ? $matched : '<?= \\SugarCommerce\\Templates\\Engine::json( ' . $expression . ' ) ?>',
 			'empty'       => $this->empty( $expression ),
 			'endempty'    => '<?php endif; ?>',
 			default       => $matched,
@@ -372,6 +379,11 @@ final class Compiler {
 
 	/**
 	 * Compile `@section`, in both of its forms.
+	 *
+	 * The inline form's value is stored as it is and printed by `@yield`
+	 * as it is — raw, like `{!! !!}`. It is for literals and for markup
+	 * built on purpose; anything else goes through `e()` first, or in the
+	 * block form between `{{ }}`.
 	 *
 	 * @since 1.0.0
 	 *

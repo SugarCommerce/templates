@@ -37,16 +37,20 @@ final class Environment {
 	/**
 	 * Names of sections currently being captured, innermost last.
 	 *
-	 * @var array<int, string>
+	 * @var list<string>
 	 */
 	private array $open = array();
 
 	/**
 	 * The layout this template asked for, if any.
+	 *
+	 * @since 1.0.0
 	 */
 	private ?string $layout = null;
 
 	/**
+	 * Start a render's state.
+	 *
 	 * @param Engine $engine The engine, for resolving includes.
 	 */
 	public function __construct( private readonly Engine $engine ) {}
@@ -124,6 +128,11 @@ final class Environment {
 	/**
 	 * Set a section to a short value, without a block.
 	 *
+	 * The value is markup, not text: it is stored and later yielded exactly
+	 * as given, the way `{!! !!}` prints. Escape anything that did not
+	 * come from you — `@section( 'title', Engine::e( $product['name'] ) )`,
+	 * with the class named in full, or the block form with `{{ }}` inside it.
+	 *
 	 * @since 1.0.0
 	 *
 	 * @param string $name  Section name.
@@ -137,6 +146,9 @@ final class Environment {
 
 	/**
 	 * The content of a section.
+	 *
+	 * Markup, unescaped, and so is the default: both are printed by
+	 * `@yield` as they are.
 	 *
 	 * @since 1.0.0
 	 *
@@ -158,15 +170,16 @@ final class Environment {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $name  Template name.
-	 * @param array  $scope The caller's variables.
-	 * @param array  $extra Additional variables, winning over the scope.
+	 * @param string               $name  Template name.
+	 * @param array<string, mixed> $scope The caller's variables.
+	 * @param array<string, mixed> $extra Additional variables, winning over
+	 *                                    the scope.
 	 *
 	 * @return string
 	 */
 	public function include( string $name, array $scope = array(), array $extra = array() ): string {
 		foreach ( array_keys( $scope ) as $key ) {
-			if ( str_starts_with( (string) $key, '__' ) ) {
+			if ( str_starts_with( $key, '__' ) ) {
 				unset( $scope[ $key ] );
 			}
 		}

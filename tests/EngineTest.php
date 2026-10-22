@@ -435,4 +435,67 @@ final class EngineTest extends TestCase {
 		$this->assertStringContainsString( 'Compiled from', $compiled );
 		$this->assertStringContainsString( 'do not edit', $compiled );
 	}
+
+	/* ─── Found in review ───────────────────────────────────────────── */
+
+	/**
+	 * The origin path is written into a PHP comment; a `*\/` in it would end
+	 * the comment and run the rest of the name.
+	 */
+	public function test_a_file_name_cannot_close_the_header_comment(): void {
+		$compiled = ( new \SugarCommerce\Templates\Compiler() )->compile( 'hi', '/t/x*/ echo "pwned"; /*.blade.php' );
+
+		ob_start();
+		eval( '?>' . $compiled );
+		$output = (string) ob_get_clean();
+
+		$this->assertSame( 'hi', $output );
+	}
+
+	/**
+	 * A backslash in a <script> string ends it early; @json() cannot be
+	 * broken out of, nor can a value close the block.
+	 */
+	public function test_json_is_safe_inside_a_script_block(): void {
+		$this->write( 'page', '<script>var a = @json( $a );</script>' );
+
+		$html = $this->render( 'page', array( 'a' => "</script><script>alert(1)//\\'\"&" ) );
+
+		$this->assertStringNotContainsString( '</script><script>', $html );
+		$this->assertSame( 1, substr_count( $html, '</script>' ) );
+		$this->assertStringNotContainsString( "'", substr( $html, 8, -9 ) );
+		$this->assertSame( "</script><script>alert(1)//\\'\"&", json_decode( substr( $html, 16, -10 ) ) );
+	}
+
+	public function test_a_bare_json_is_left_alone(): void {
+		$this->write( 'page', 'follow @json on social' );
+
+		$this->assertSame( 'follow @json on social', $this->render( 'page' ) );
+	}
+
+	/**
+	 * Without ENT_SUBSTITUTE a single bad byte emptied the whole value.
+	 */
+	public function test_a_malformed_byte_does_not_empty_the_value(): void {
+		$this->assertSame( "caf\u{FFFD} &lt;b&gt;", Engine::e( "caf\xE9 <b>" ) );
+	}
+
+	public function test_a_resource_cannot_be_printed(): void {
+		$this->expectException( \InvalidArgumentException::class );
+
+		Engine::e( STDIN );
+	}
+
+	public function test_a_template_name_with_a_backslash_or_a_control_character_is_refused(): void {
+		$engine = new Engine( $this->root, $this->cache );
+
+		foreach ( array( "a\\b", "page\0", "page\n" ) as $name ) {
+			try {
+				$engine->path( $name );
+				$this->fail( 'Accepted ' . json_encode( $name ) );
+			} catch ( \InvalidArgumentException ) {
+				$this->addToAssertionCount( 1 );
+			}
+		}
+	}
 }

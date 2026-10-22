@@ -35,19 +35,36 @@ final class Engine {
 	 *
 	 * A layout that extends itself is a hang rather than an error, so this
 	 * turns it into one that names the file.
+	 *
+	 * @since 1.0.0
 	 */
 	private const int MAX_LAYOUTS = 16;
 
+	/**
+	 * Turns template source into PHP.
+	 *
+	 * @since 1.0.0
+	 */
 	private readonly Compiler $compiler;
 
 	/**
-	 * @param string $root      Directory templates are resolved against.
-	 * @param string $cache     Directory for compiled output. Created if it
-	 *                          does not exist.
-	 * @param string $extension Template file extension.
-	 * @param bool   $always    Recompile on every render. For development,
-	 *                          where a template's own `@include`s can change
-	 *                          without its mtime moving.
+	 * Point the engine at its templates and its cache.
+	 *
+	 * The cache holds compiled PHP that is `require`d on the next render, so
+	 * it is code as much as the templates are: anybody who can write to it
+	 * can run anything as this process. Keep it outside the document root
+	 * and writable by this application alone.
+	 *
+	 * @param string        $root      Directory templates are resolved
+	 *                                 against.
+	 * @param string        $cache     Directory for compiled output. Created
+	 *                                 if it does not exist.
+	 * @param string        $extension Template file extension.
+	 * @param bool          $always    Recompile on every render. For
+	 *                                 development, where a template's own
+	 *                                 `@include`s can change without its
+	 *                                 mtime moving.
+	 * @param Compiler|null $compiler  The compiler, or null for a new one.
 	 */
 	public function __construct(
 		private readonly string $root,
@@ -64,6 +81,20 @@ final class Engine {
 	 *
 	 * What `{{ }}` compiles to. Static because compiled templates call it by
 	 * name rather than holding a reference to anything.
+	 *
+	 * HTML is the one context it makes safe: text between tags, and an
+	 * attribute value **in quotes**. It is not enough for —
+	 *
+	 * - an unquoted attribute, where a space starts a new attribute;
+	 * - a URL attribute, where `javascript:alert(1)` has nothing in it to
+	 *   escape — check the scheme before it gets here;
+	 * - a `style` attribute or a `<style>` block, where `red;background:url(…)`
+	 *   is still CSS — validate the value instead;
+	 * - a `<script>` block, where a backslash ends a string early — use
+	 *   `@json()` there, which is what it is for.
+	 *
+	 * A string that is not valid UTF-8 prints with U+FFFD where the bad bytes
+	 * were, rather than vanishing.
 	 *
 	 * @since 1.0.0
 	 *
@@ -85,13 +116,37 @@ final class Engine {
 			return '1';
 		}
 
-		if ( is_array( $value ) || ( is_object( $value ) && ! $value instanceof \Stringable ) ) {
+		if ( ! is_scalar( $value ) && ! $value instanceof \Stringable ) {
 			throw new \InvalidArgumentException(
 				'Cannot print a ' . get_debug_type( $value ) . '. Pick a value out of it, or use a helper.'
 			);
 		}
 
-		return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+		return htmlspecialchars( (string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+	}
+
+	/**
+	 * Encode a value as JSON that is safe inside a `<script>` block or an
+	 * HTML attribute.
+	 *
+	 * What `@json()` compiles to. `<`, `>`, `&` and both quotes come out as
+	 * `\u003C`-style escapes, so a string holding `</script>` cannot close
+	 * the block it is printed into, and the result can sit in a quoted
+	 * attribute — `data-config="@json( $config )"` — as it is.
+	 *
+	 * @since 1.1.0
+	 *
+	 * @param mixed $value Anything json_encode() accepts.
+	 *
+	 * @return string
+	 *
+	 * @throws \JsonException When the value cannot be encoded.
+	 */
+	public static function json( mixed $value ): string {
+		return json_encode(
+			$value,
+			JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+		);
 	}
 
 	/**
@@ -99,13 +154,21 @@ final class Engine {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string $name Template name, e.g. `admin.files` or `admin/files`.
-	 * @param array  $data Variables for its scope.
+	 * @param string               $name Template name, e.g. `admin.files` or
+	 *                                   `admin/files`.
+	 * @param array<string, mixed> $data Variables for its scope. Pass named
+	 *                                   values, never a request's input
+	 *                                   wholesale: every key becomes a
+	 *                                   variable, including one a template
+	 *                                   only expected to be set by you.
 	 *
 	 * @return string
 	 *
 	 * @throws \RuntimeException When a template is missing, or layouts nest
 	 *                           too deeply to be anything but a loop.
+	 * @throws \InvalidArgumentException When a template name climbs out of
+	 *                                   the root, or a value cannot be
+	 *                                   printed.
 	 */
 	public function render( string $name, array $data = array() ): string {
 		$environment = new Environment( $this );
@@ -150,7 +213,9 @@ final class Engine {
 	 *
 	 * @return string
 	 *
-	 * @throws \InvalidArgumentException On a name that climbs out of the root.
+	 * @throws \InvalidArgumentException On a name that climbs out of the root,
+	 *                                   or carries a backslash or a control
+	 *                                   character.
 	 */
 	public function path( string $name ): string {
 		// Before the dots become slashes, or `..` turns into `//` and the
@@ -159,6 +224,10 @@ final class Engine {
 		// refactor into a file read.
 		if ( str_contains( $name, '..' ) ) {
 			throw new \InvalidArgumentException( 'A template name may not contain "..": ' . $name );
+		}
+
+		if ( 1 === preg_match( '/[\x00-\x1F\x7F\\\\]/', $name ) ) {
+			throw new \InvalidArgumentException( 'A template name may not contain a backslash or a control character.' );
 		}
 
 		$relative = str_replace( '.', '/', trim( $name, '/' ) );
@@ -171,9 +240,10 @@ final class Engine {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param string      $name        Template name.
-	 * @param array       $data        Variables for its scope.
-	 * @param Environment $environment This render's sections and layout.
+	 * @param string               $name        Template name.
+	 * @param array<string, mixed> $data        Variables for its scope.
+	 * @param Environment          $environment This render's sections and
+	 *                                          layout.
 	 *
 	 * @return string
 	 *
@@ -258,7 +328,10 @@ final class Engine {
 			throw new \RuntimeException( 'Cannot create the template cache directory: ' . $directory );
 		}
 
-		$temporary = $target . '.' . getmypid() . '.tmp';
+		// Random rather than the process id: threads in one process — a
+		// ZTS build, FrankenPHP — share a pid, and two of them writing the
+		// same temporary file is the half-written template this avoids.
+		$temporary = $target . '.' . bin2hex( random_bytes( 8 ) ) . '.tmp';
 
 		if ( false === @file_put_contents( $temporary, $contents ) || ! @rename( $temporary, $target ) ) {
 			@unlink( $temporary );
