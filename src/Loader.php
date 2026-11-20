@@ -66,7 +66,7 @@ final class Loader {
 	 *
 	 * @since 1.0.0
 	 */
-	private const RESERVED = [ 'this', 'args', 'GLOBALS', '_GET', '_POST', '_COOKIE', '_FILES', '_SERVER', '_ENV', '_REQUEST', '_SESSION' ];
+	private const array RESERVED = [ 'this', 'args', 'GLOBALS', '_GET', '_POST', '_COOKIE', '_FILES', '_SERVER', '_ENV', '_REQUEST', '_SESSION' ];
 
 	/**
 	 * How many templates deep one may load another.
@@ -78,7 +78,7 @@ final class Loader {
 	 *
 	 * @since 1.0.0
 	 */
-	public const MAX_DEPTH = 64;
+	public const int MAX_DEPTH = 64;
 
 	/**
 	 * The flags json() encodes with.
@@ -89,7 +89,7 @@ final class Loader {
 	 *
 	 * @since 1.0.0
 	 */
-	private const JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
+	private const int JSON_FLAGS = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES;
 
 	/**
 	 * How many templates are being loaded, one inside another, right now.

@@ -188,23 +188,24 @@ Overrides::files( $dir );                                   // every template in
 Overrides::version( $file );                                // a template's @version, or ''
 ```
 
-## Moving from arraypress/wp-*
+## Security
 
-From `arraypress/wp-template-loader` (`ArrayPress\TemplateLoader`). Every class
-and method keeps its name under `SugarCommerce\Templates`, and every hook its
-name from the prefix.
+* Path traversal: a template name that is empty, absolute, holds `..`, a
+  backslash, a colon or a control character is refused, and a file swapped
+  in through `{prefix}_get_template` must exist.
+* Variable injection: an argument named `this`, `args`, a superglobal or
+  anything starting `__` is never made a variable, so it cannot replace the
+  file being loaded or a global.
+* A template that loads itself stops at 64 levels instead of exhausting the
+  stack.
+* `Loader::json()` is safe inside `<script>` and in an attribute; the theme
+  versions Site Health lists are escaped.
 
-| Old | New |
-|---|---|
-| `ArrayPress\TemplateLoader\Loader` | `SugarCommerce\Templates\Loader` |
-| `ArrayPress\TemplateLoader\Overrides` | `SugarCommerce\Templates\Overrides` |
-| `ArrayPress\TemplateLoader\SiteHealth` | `SugarCommerce\Templates\SiteHealth` |
-| `'' !== $loader->locate( $name )` | `$loader->exists( $name )` (the old form still works) |
-| an argument named `__anything` | refused as a variable with a notice, still in `$args` (before, only `__file` and `__variables` were skipped, silently) |
-| text domain `arraypress` | text domain `sugarcommerce` |
+## Layout
 
-New: `Loader::exists()`, `Loader::json()`, `Loader::MAX_DEPTH`, and `html()`
-closing buffers a template left open.
+* `src/Loader.php`: finding and loading a template, with theme overrides.
+* `src/Overrides.php`: the theme's copies and their `@version`s.
+* `src/SiteHealth.php`: the Site Health test for outdated copies.
 
 ## Requirements
 
